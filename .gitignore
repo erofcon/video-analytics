@@ -1,1 +1,11 @@
 /target
+/vendor
+.cargo
+
+.env
+.env.*
+*.p8
+*.key
+*.pem
+
+.idea/
