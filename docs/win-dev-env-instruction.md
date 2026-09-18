@@ -1,22 +1,22 @@
 # Windows Development Environment
 
-
 Эта инструкция описывает настройку Windows для разработки проекта `video-analytics`.
 
 Используемый стек:
 
-- Rust
-- MSVC
-- Windows SDK
-- LLVM / Clang
-- FFmpeg 8.1
-- `ffmpeg-next = 8.1.0`
+* Rust
+* MSVC
+* Windows SDK
+* LLVM / Clang
+* FFmpeg 8.1
+* `ffmpeg-next = 8.1.0`
 
-После настройки проект должен собираться из **обычного PowerShell**:
+После настройки проект должен собираться и запускаться из обычного PowerShell:
 
 ```powershell
 cargo check
 cargo build
+cargo run -p worker
 ```
 
 Открывать `Developer PowerShell for VS 2022` вручную не требуется.
@@ -27,7 +27,7 @@ cargo build
 
 ОС:
 
-- Windows 10/11 x64
+* Windows 10/11 x64
 
 Необходимые компоненты:
 
@@ -91,13 +91,13 @@ https://visualstudio.microsoft.com/downloads/
 
 Убедиться, что установлены:
 
-- MSVC v143 C++ build tools
-- Windows 10/11 SDK
-- C++ CMake tools for Windows
+* MSVC v143 C++ build tools
+* Windows 10/11 SDK
+* C++ CMake tools for Windows
 
-Для проекта необходим именно MSVC toolchain.
+Для проекта используется MSVC toolchain.
 
-После установки проверить наличие:
+После установки проверить наличие, например:
 
 ```text
 C:\Program Files\Microsoft Visual Studio\2022\Community\
@@ -146,7 +146,11 @@ True
 Один раз выполнить:
 
 ```powershell
-[Environment]::SetEnvironmentVariable( "LIBCLANG_PATH", "C:\Program Files\LLVM\bin", "User" )
+[Environment]::SetEnvironmentVariable(
+    "LIBCLANG_PATH",
+    "C:\Program Files\LLVM\bin",
+    "User"
+)
 ```
 
 Закрыть PowerShell и открыть новый.
@@ -187,7 +191,7 @@ FFmpeg 8.1
 
 Используется Windows x86_64 shared development build.
 
-Скачать необходимо архив вида:
+Скачать архив вида:
 
 ```text
 ffmpeg-n8.1-latest-win64-gpl-shared-8.1.zip
@@ -197,61 +201,65 @@ ffmpeg-n8.1-latest-win64-gpl-shared-8.1.zip
 
 https://github.com/BtbN/FFmpeg-Builds/releases
 
-Не использовать только runtime-версию FFmpeg, в которой отсутствуют:
+Необходимо использовать именно **development build**, содержащий:
 
 ```text
+bin/
 include/
 lib/
 ```
 
-Для сборки Rust bindings необходимы FFmpeg headers и libraries.
+`include/` и `lib/` необходимы для сборки `ffmpeg-sys-next`.
 
 ---
 
-# Размещение FFmpeg в проекте
+# Размещение FFmpeg
 
-После распаковки FFmpeg должен находиться внутри проекта:
+FFmpeg устанавливается глобально.
 
-```text
-video-analytics/
-└── vendor/
-    └── ffmpeg/
-        ├── bin/
-        ├── include/
-        ├── lib/
-        ├── doc/
-        └── presets/
-```
-
-Например, если архив был распакован в:
+Рекомендуемый путь:
 
 ```text
-C:\ffmpeg\ffmpeg-n8.1-latest-win64-gpl-shared-8.1
+C:\ffmpeg\
+├── bin\
+├── include\
+├── lib\
+├── doc\
+└── presets\
 ```
 
-из корня проекта выполнить:
+Например, после распаковки:
 
-```powershell
-New-Item -ItemType Directory -Force vendor
+```text
+C:\ffmpeg\ffmpeg-n8.1-latest-win64-gpl-shared-8.1\
+```
 
-Copy-Item `
-    "C:\ffmpeg\ffmpeg-n8.1-latest-win64-gpl-shared-8.1" `
-    ".\vendor\ffmpeg" `
-    -Recurse
+содержимое этой директории необходимо разместить непосредственно в:
+
+```text
+C:\ffmpeg\
+```
+
+В результате должны существовать:
+
+```text
+C:\ffmpeg\bin\ffmpeg.exe
+C:\ffmpeg\include\libavcodec\avcodec.h
+C:\ffmpeg\lib
 ```
 
 Проверить:
 
 ```powershell
-Test-Path ".\vendor\ffmpeg\bin\ffmpeg.exe"
+Test-Path "C:\ffmpeg\bin\ffmpeg.exe"
 ```
 
 ```powershell
-Test-Path ".\vendor\ffmpeg\include\libavcodec\avcodec.h"
+Test-Path "C:\ffmpeg\include\libavcodec\avcodec.h"
 ```
 
 ```powershell
-Test-Path ".\vendor\ffmpeg\lib"
+Test-Path "C:\ffmpeg\lib"
 ```
 
 Все команды должны вернуть:
@@ -259,6 +267,65 @@ Test-Path ".\vendor\ffmpeg\lib"
 ```text
 True
 ```
+
+---
+
+# Настройка PATH для FFmpeg
+
+Добавить:
+
+```text
+C:\ffmpeg\bin
+```
+
+в пользовательский `PATH`.
+
+В PowerShell выполнить:
+
+```powershell
+$currentPath = [Environment]::GetEnvironmentVariable("Path", "User")
+
+if ($currentPath -notlike "*C:\ffmpeg\bin*") {
+    [Environment]::SetEnvironmentVariable(
+        "Path",
+        "$currentPath;C:\ffmpeg\bin",
+        "User"
+    )
+}
+```
+
+Если команда не сработала, можно использовать `setx`:
+
+```powershell
+setx PATH "$([Environment]::GetEnvironmentVariable('Path', 'User'));C:\ffmpeg\bin"
+```
+
+После изменения **полностью закрыть PowerShell и открыть новый**.
+
+Проверить:
+
+```powershell
+where.exe ffmpeg
+```
+
+Ожидается:
+
+```text
+C:\ffmpeg\bin\ffmpeg.exe
+```
+
+Если в системе уже установлен FFmpeg через Chocolatey и `where.exe ffmpeg` показывает несколько путей, `C:\ffmpeg\bin` должен находиться первым.
+
+Проверить версию:
+
+```powershell
+ffmpeg -version
+```
+
+В выводе должна быть версия FFmpeg 8.1.x.
+
+
+> Если ранее FFmpeg был установлен через Chocolatey, `where.exe ffmpeg` может показать несколько файлов. `C:\ffmpeg\bin` должен находиться раньше Chocolatey в `PATH`.
 
 ---
 
@@ -275,22 +342,24 @@ True
 
 ```toml
 [env]
-FFMPEG_DIR = { value = "vendor/ffmpeg", relative = true }
+FFMPEG_DIR = "C:/ffmpeg"
 ```
 
-Это позволяет Cargo автоматически устанавливать:
+`FFMPEG_DIR` указывает `ffmpeg-sys-next`, где находятся:
 
 ```text
-FFMPEG_DIR
+C:\ffmpeg\include
+C:\ffmpeg\lib
+C:\ffmpeg\bin
 ```
 
-относительно корня проекта.
-
-Поэтому больше не требуется каждый раз выполнять:
+Больше не требуется:
 
 ```powershell
 $env:FFMPEG_DIR=...
 ```
+
+Также больше не требуется хранить FFmpeg внутри Git-репозитория.
 
 ---
 
@@ -306,8 +375,8 @@ ffmpeg-next = "=8.1.0"
 Версия FFmpeg и версия Rust crate — разные вещи:
 
 ```text
-FFmpeg        8.1
-ffmpeg-next   8.1.0
+FFmpeg          8.1
+ffmpeg-next     8.1.0
 ffmpeg-sys-next 8.1.0
 ```
 
@@ -328,22 +397,17 @@ ffmpeg-sys-next v8.1.0
 
 # MSVC в обычном PowerShell
 
-Visual Studio устанавливает необходимые инструменты:
+Visual Studio устанавливает:
 
 ```text
 cl.exe
 link.exe
 Windows SDK
-INCLUDE
-LIB
-PATH
 ```
 
-Обычно они активируются через Developer PowerShell.
+Обычно необходимые переменные окружения активируются через Developer PowerShell.
 
-В этом проекте Developer PowerShell не должен требоваться для каждой сборки.
-
-Для автоматизации используется:
+Чтобы не запускать его вручную, используется:
 
 ```text
 scripts/
@@ -363,18 +427,30 @@ if (-not (Test-Path $vsDevShell)) {
 
 & $vsDevShell -Arch amd64 -HostArch amd64 -SkipAutomaticLocation
 
+if (-not (Test-Path "C:\Program Files\LLVM\bin\libclang.dll")) {
+    throw "libclang.dll not found"
+}
+
 $env:LIBCLANG_PATH = "C:\Program Files\LLVM\bin"
+
+if (-not (Test-Path "C:\ffmpeg\bin\ffmpeg.exe")) {
+    throw "FFmpeg not found: C:\ffmpeg\bin\ffmpeg.exe"
+}
 
 Write-Host ""
 Write-Host "Development environment initialized." -ForegroundColor Green
+Write-Host ""
+Write-Host "FFmpeg: C:\ffmpeg"
+Write-Host "LLVM:   C:\Program Files\LLVM\bin"
+Write-Host "Target: x86_64-pc-windows-msvc"
 ```
 
 Путь к Visual Studio необходимо изменить, если используется:
 
-- Professional
-- Enterprise
-- Build Tools
-- другой каталог установки
+* Professional
+* Enterprise
+* Build Tools
+* другой каталог установки.
 
 ---
 
@@ -402,9 +478,9 @@ notepad $PROFILE
 
 Заменить `<USERNAME>` на имя пользователя Windows.
 
-После этого новый PowerShell автоматически получает окружение Visual Studio.
+После этого новый PowerShell автоматически получает окружение Visual Studio и LLVM.
 
-> Не добавлять этот абсолютный путь в Git. PowerShell profile является локальной настройкой конкретного компьютера.
+> Не добавлять абсолютный путь к `setup-dev.ps1` в Git. PowerShell profile является локальной настройкой конкретного компьютера.
 
 ---
 
@@ -426,7 +502,7 @@ cl
 where.exe cl
 ```
 
-Также проверить:
+Также:
 
 ```powershell
 where.exe link
@@ -460,20 +536,34 @@ True
 
 ---
 
-#  Проверка FFmpeg
+# Проверка FFmpeg
 
-Из корня проекта:
+Проверить расположение:
 
 ```powershell
-Test-Path ".\vendor\ffmpeg\bin\ffmpeg.exe"
+where.exe ffmpeg
+```
+
+Ожидается:
+
+```text
+C:\ffmpeg\bin\ffmpeg.exe
+```
+
+Проверить версию:
+
+```powershell
+ffmpeg -version
+```
+
+Проверить development-файлы:
+
+```powershell
+Test-Path "C:\ffmpeg\include\libavcodec\avcodec.h"
 ```
 
 ```powershell
-Test-Path ".\vendor\ffmpeg\include\libavcodec\avcodec.h"
-```
-
-```powershell
-Test-Path ".\vendor\ffmpeg\lib"
+Test-Path "C:\ffmpeg\lib"
 ```
 
 Все должны вернуть:
@@ -481,14 +571,6 @@ Test-Path ".\vendor\ffmpeg\lib"
 ```text
 True
 ```
-
-Дополнительно:
-
-```powershell
-.\vendor\ffmpeg\bin\ffmpeg.exe -version
-```
-
-В выводе должна быть версия FFmpeg 8.1.x.
 
 ---
 
@@ -512,6 +594,46 @@ cargo build
 cargo build -p worker
 ```
 
+Запуск:
+
+```powershell
+cargo run -p worker
+```
+
+---
+
+# Структура проекта
+
+FFmpeg больше не хранится внутри проекта:
+
+```text
+video-analytics/
+│
+├── .cargo/
+│   └── config.toml
+│
+├── scripts/
+│   └── setup-dev.ps1
+│
+├── worker/
+│   ├── Cargo.toml
+│   └── src/
+│       └── main.rs
+│
+├── Cargo.toml
+└── ...
+```
+
+FFmpeg находится отдельно:
+
+```text
+C:\ffmpeg\
+├── bin\
+├── include\
+└── lib\
+```
+
+---
 
 # Важное замечание для нового разработчика
 
@@ -520,24 +642,44 @@ cargo build -p worker
 1. Rust
 2. Visual Studio 2022 C++ workload
 3. Windows SDK
-4. LLVM
+4. LLVM / Clang
+5. FFmpeg 8.1 development build
 
-После этого FFmpeg берётся из:
+FFmpeg устанавливается в:
 
 ```text
-vendor/ffmpeg/
+C:\ffmpeg
 ```
 
-а Cargo автоматически использует его через:
+`ffmpeg-next` получает путь к FFmpeg через:
 
 ```text
 .cargo/config.toml
 ```
 
-После настройки окружения проект собирается обычной командой:
+```toml
+[env]
+FFMPEG_DIR = "C:/ffmpeg"
+```
+
+А Windows находит FFmpeg и его DLL через:
+
+```text
+C:\ffmpeg\bin
+```
+
+в системном `PATH`.
+
+После настройки проект собирается обычной командой:
 
 ```powershell
 cargo build
+```
+
+и запускается:
+
+```powershell
+cargo run -p worker
 ```
 
 ---
@@ -547,18 +689,19 @@ cargo build
 На момент создания инструкции проект использует:
 
 ```text
-OS:              Windows x64
-Compiler:        MSVC
-Visual Studio:   2022
-Rust:            stable
-Target:          x86_64-pc-windows-msvc
-LLVM/Clang:      установлен системно
-FFmpeg:          8.1
-ffmpeg-next:     8.1.0
-ffmpeg-sys-next: 8.1.0
+OS:                Windows x64
+Compiler:          MSVC
+Visual Studio:     2022
+Rust:              stable
+Target:            x86_64-pc-windows-msvc
+LLVM/Clang:        установлен системно
+FFmpeg:            8.1
+FFmpeg location:   C:\ffmpeg
+ffmpeg-next:       8.1.0
+ffmpeg-sys-next:   8.1.0
 ```
 
-При изменении версии FFmpeg необходимо одновременно проверить совместимость:
+При изменении версии FFmpeg необходимо проверить совместимость:
 
 ```text
 FFmpeg

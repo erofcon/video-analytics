@@ -7,5 +7,6 @@
 *.p8
 *.key
 *.pem
+*.mp4
 
 .idea/
